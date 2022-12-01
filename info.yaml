@@ -13,13 +13,13 @@ project:
 #
 # This info will be automatically collected and used to make a datasheet for the chip.
 documentation: 
-  author:       "Myrtle Shah"      # Your name
+  author:       "myrtle"      # Your name
   discord:      "gatecat#6502"      # Your discord handle
-  title:        "Tiny PIC-ish MCU"      # Project title
+  title:        "Tiny PIC-like MCU"      # Project title
   description:  "serially programmed, subset of PIC ISA, MCU"      # Short description of what your project does
-  how_it_works: "TODO"      # Longer description of how the project works
-  how_to_test:  "TODO"      # Instructions on how someone could test your project, include things like what buttons do what and how to set the clock if needed
-  external_hw:  ""      # Describe any external hardware needed
+  how_it_works: "Implements a subset of the PIC mid-range ISA (no SFR, no carry, no call/stack), 6 GPRs, 16 program words."      # Longer description of how the project works
+  how_to_test:  "Program data is shifted in serially. For each program word, shift in {(1 << address), data} (28 bits total) to prog_data and then assert prog_strobe. Once loaded, deassert (bring high), reset and the program should start running. GPR 6 is GPI and GPR 7 is GPO"      # Instructions on how someone could test your project, include things like what buttons do what and how to set the clock if needed
+  external_hw:  "A means of shifting in the program (e.g. another microcontroller, USB GPIO interface, etc) is required at startup. Once running, it is standalone."      # Describe any external hardware needed
   language:     "verilog" # other examples include Verilog, Amaranth, VHDL, etc
   doc_link:     ""      # URL to longer form documentation, eg the README.md in your repository
   clock_hz:     1000       # Clock frequency in Hz (if required)

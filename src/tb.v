@@ -31,20 +31,18 @@ module tb;
 
     integer i, j;
     initial begin
-        program[0] = 12'b00_00010_00000; // CLRW
-        program[1] = 12'b00_00000_10000; // GPO <= W
-        program[2] = 12'b00_10100_00000; // W <= W + 1
-        program[3] = 12'b10_10000_00001; // GOTO 1
+        program[0] = 12'b00_10000_00000; // W <= r0
+        program[1] = 12'b00_00001_00111; // GPO <= W
+        program[2] = 12'b00_10101_00000; // r0 <= r0 + 1
+        program[3] = 12'b10_10000_00000; // GOTO 0
         program[4] = 12'b00_00000_00000;
         program[5] = 12'b00_00000_00000;
         program[6] = 12'b00_00000_00000;
         program[7] = 12'b00_00000_00000;
         program[8] = 12'b00_00000_00000;
-        program[9] = 12'b00_00000_00000;
-        program[10] = 12'b00_00000_00000;
 
         for (i = 0; i < 11; i = i + 1'b1) begin
-            for (j = 0; j < 24; j = j + 1'b1) begin
+            for (j = 0; j < 28; j = j + 1'b1) begin
                 prog_data = (j < 12) ? program[i][j] : (j == (i + 12));
                 cycle;
             end

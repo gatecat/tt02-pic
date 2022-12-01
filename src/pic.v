@@ -5,7 +5,7 @@ module pic10_core(input clock, reset, output [3:0] prog_adr, input [11:0] prog_d
     reg [1:0] phase;
     reg [3:0] pc;
     reg [3:0] next_pc;
-    reg skip, next_skip;
+    reg skip, next_skip, next_skip_zero;
     reg reg_we, w_we;
 
     assign prog_adr = pc;
@@ -30,14 +30,15 @@ module pic10_core(input clock, reset, output [3:0] prog_adr, input [11:0] prog_d
             if (phase == 0) begin
                 skip <= next_skip;
                 next_skip <= 1'b0;
+                next_skip_zero <= 1'b0;
                 reg_we <= 1'b0;
                 w_we <= 1'b0;
                 pc <= next_pc;
             end else if (phase == 1) begin
                 next_pc <= prog_adr + 1'b1;
                 if (prog_data[11:10] == 2'b00) begin
-                    reg_we <= prog_data[4];
-                    w_we <= ~prog_data[4] & (prog_data[9:5] != 5'b00000);
+                    reg_we <= prog_data[5];
+                    w_we <= ~prog_data[5];
                     case (prog_data[9:6])
                         4'b0000: result <= w;
                         4'b0001: result <= 0;
@@ -45,14 +46,16 @@ module pic10_core(input clock, reset, output [3:0] prog_adr, input [11:0] prog_d
                         4'b0011: result <= reg_rdata - 1;
                         4'b0100: result <= reg_rdata | w;
                         4'b0101: result <= reg_rdata & w;
+                        4'b0110: result <= reg_rdata ^ w;
                         4'b0111: result <= reg_rdata + w;
                         4'b1000: result <= reg_rdata;
                         4'b1001: result <= ~reg_rdata;
                         4'b1010: result <= reg_rdata + 1;
-                        4'b1010: begin result <= reg_rdata - 1; next_skip <= reg_rdata == 8'h01; end
-                        4'b1111: begin result <= reg_rdata + 1; next_skip <= reg_rdata == 8'hff; end
+                        4'b1011: begin result <= reg_rdata - 1; next_skip_zero <= 1'b1; end
+                        4'b1111: begin result <= reg_rdata + 1; next_skip_zero <= 1'b1; end
                     endcase
                 end else if (prog_data[11:10] == 2'b01) begin
+                    reg_we <= 1'b1;
                     case (prog_data[9:8])
                         2'b00: result <= reg_rdata & ~(1 << prog_data[7:5]);
                         2'b01: result <= reg_rdata | (1 << prog_data[7:5]);
@@ -61,7 +64,7 @@ module pic10_core(input clock, reset, output [3:0] prog_adr, input [11:0] prog_d
                     endcase
                 end else if (prog_data[11:10] == 2'b10) begin
                     // no call, return
-                    if (prog_data[9] == 1'b1)
+                    if (!skip)
                         next_pc <= prog_data[3:0];
                 end else if (prog_data[11:10] == 2'b11) begin
                     w_we <= 1'b1;
@@ -73,6 +76,9 @@ module pic10_core(input clock, reset, output [3:0] prog_adr, input [11:0] prog_d
                     endcase
                 end
             end else if (phase == 2) begin
+                if (next_skip_zero) begin
+                    next_skip <= (result == 0);
+                end
                 if (!skip) begin
                     if (w_we)
                         w <= result;
@@ -83,24 +89,27 @@ module pic10_core(input clock, reset, output [3:0] prog_adr, input [11:0] prog_d
         end
     end
 
-    wire [4:0] reg_addr = prog_data[4:0];
+    wire [2:0] reg_addr = prog_data[2:0];
     always @(posedge clock) begin
-        if (reg_we && (phase == 2) && reg_addr[4] && !skip)
+        if (reg_we && regf_we && (reg_addr == 7))
             gpo <= result;
     end
 
-    wire [7:0] regf_data[0:3];
-    assign reg_rdata = reg_addr[4] ? {4'b0000, gpi} : regf_data[reg_addr[1:0]];
+    wire [7:0] regf_data[0:7];
+    assign regf_data[6] = {4'b0000, gpi};
+    assign regf_data[7] = gpo;
+
+    assign reg_rdata = regf_data[reg_addr];
 
     // register file
     wire regf_we = phase[1] & !skip;
 
     generate
         genvar ii, jj;
-        for (ii = 0; ii < 4; ii = ii + 1'b1) begin:word
+        for (ii = 0; ii < 6; ii = ii + 1'b1) begin:word
             wire word_we;
             sky130_fd_sc_hd__and3_1 word_we_i ( // make sure this is really glitch free
-                .A(reg_addr[1:0] == ii),
+                .A(reg_addr[2:0] == ii),
                 .B(regf_we),
                 .C(reg_we),
                 .X(word_we)
@@ -141,12 +150,12 @@ endmodule
 
 // latch based program memory
 module pic_progmem(input clock, write_data, write_strobe, input [3:0] adr, output [11:0] rdata);
-    localparam K = 12;
+    localparam K = 16;
 
     // the program logic
-    reg [23:0] write_sr;
+    reg [27:0] write_sr;
     always @(posedge clock)
-        write_sr <= {write_data, write_sr[23:1]};
+        write_sr <= {write_data, write_sr[27:1]};
 
     wire [11:0] data[0:K-1];
     generate
